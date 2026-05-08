@@ -1,9 +1,12 @@
 "use client";
 
-import { Eye, MoreVertical, Search } from "lucide-react";
+import { Eye, MoreVertical, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
+import { parseRegisteredAtItalian } from "@/lib/end-user-registration-filter";
 
 type ReconciliationStatus = "Matched" | "Unmatched" | "Parziale";
 
@@ -162,10 +165,32 @@ function rowTint(status: ReconciliationStatus) {
   return "";
 }
 
+function filterByItalianDateLast30Days<T extends { date: string }>(rows: T[]): T[] {
+  const withDates = rows
+    .map((r) => ({ r, d: parseRegisteredAtItalian(r.date) }))
+    .filter((x): x is { r: T; d: Date } => x.d !== null);
+  if (withDates.length === 0) return rows;
+  const maxT = Math.max(...withDates.map((x) => x.d.getTime()));
+  const cutoff = maxT - 30 * 24 * 60 * 60 * 1000;
+  return rows.filter((r) => {
+    const d = parseRegisteredAtItalian(r.date);
+    return d !== null && d.getTime() >= cutoff;
+  });
+}
+
 export default function ReconciliationPage() {
-  const rows = useMemo(() => PAYOUTS_DEMO, []);
+  const [allRows, setAllRows] = useState<PayoutRow[]>(() => PAYOUTS_DEMO);
+  const [last30Active, setLast30Active] = useState(true);
+  const [bulkReconcileOpen, setBulkReconcileOpen] = useState(false);
+  const [rowRemoveTarget, setRowRemoveTarget] = useState<PayoutRow | null>(null);
+
+  const rows = useMemo(
+    () => (last30Active ? filterByItalianDateLast30Days(allRows) : allRows),
+    [allRows, last30Active],
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const masterRef = useRef<HTMLInputElement | null>(null);
+  const selectedCount = selectedIds.size;
 
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
   const someChecked = rows.some((r) => selectedIds.has(r.id)) && !allChecked;
@@ -193,6 +218,56 @@ export default function ReconciliationPage() {
       <Topbar title="Bonifici e riconciliazione" />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-6">
+        <ConfirmationModal
+          open={bulkReconcileOpen}
+          onClose={() => setBulkReconcileOpen(false)}
+          title="Riconciliare i payout selezionati?"
+          description={
+            selectedCount === 0 ? undefined : (
+              <>
+                Stai per riconciliare{" "}
+                <span className="font-semibold text-[#1f2b20]">{selectedCount}</span>{" "}
+                {selectedCount === 1 ? "payout" : "payout"}. Confermi?
+              </>
+            )
+          }
+          confirmLabel="Riconcilia"
+          onConfirm={() => {
+            if (selectedCount === 0) return;
+            const ids = new Set(selectedIds);
+            setAllRows((prev) =>
+              prev.map((r) => (ids.has(r.id) ? { ...r, status: "Matched", delta: "€0.00", deltaTone: "neutral" } : r)),
+            );
+            setSelectedIds(new Set());
+          }}
+        />
+
+        <ConfirmationModal
+          open={rowRemoveTarget !== null}
+          onClose={() => setRowRemoveTarget(null)}
+          title="Rimuovere questo payout?"
+          description={
+            rowRemoveTarget ? (
+              <>
+                Il payout{" "}
+                <span className="font-semibold text-[#1f2b20]">{rowRemoveTarget.payoutId}</span>{" "}
+                verrà rimosso dall&apos;elenco (solo visualizzazione demo).
+              </>
+            ) : undefined
+          }
+          confirmLabel="Rimuovi"
+          onConfirm={() => {
+            if (!rowRemoveTarget) return;
+            const id = rowRemoveTarget.id;
+            setAllRows((prev) => prev.filter((r) => r.id !== id));
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }}
+        />
+
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
@@ -235,13 +310,19 @@ export default function ReconciliationPage() {
             <div className="relative">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa39a]" />
               <input
-                placeholder="Cerca transazione per ID, data, cliente..."
+                placeholder="Cerca payout per ID, data, venditore..."
                 className="h-7 w-full rounded-lg border border-black/10 bg-white pl-11 pr-4 text-[12px] font-medium text-[#1f2b20] outline-none placeholder:text-[#c0c6c0] focus:border-[#5DBE54] focus:ring-4 focus:ring-[#5DBE54]/15"
               />
             </div>
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+              onClick={() => setLast30Active((v) => !v)}
+              aria-pressed={last30Active}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+                last30Active
+                  ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                  : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+              }`}
             >
               Ultimi 30 giorni
             </button>
@@ -259,18 +340,26 @@ export default function ReconciliationPage() {
             </button>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
-            <span className="text-[#9aa39a]">Filtri attivi:</span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20]">
-              Ultimi 30 giorni <span className="text-[#9aa39a]">×</span>
-            </span>
-            <button
-              type="button"
-              className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
-            >
-              Cancella tutti
-            </button>
-          </div>
+          {last30Active ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
+              <span className="text-[#9aa39a]">Filtri attivi:</span>
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                aria-label="Rimuovi filtro Ultimi 30 giorni"
+                className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-[#e8ebe8]"
+              >
+                Ultimi 30 giorni <span className="text-[#9aa39a]">×</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
+              >
+                Cancella tutti
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-4 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
@@ -287,7 +376,13 @@ export default function ReconciliationPage() {
 
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-[#f3c2c2] bg-white px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
+              disabled={selectedCount === 0}
+              onClick={() => setBulkReconcileOpen(true)}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold ${
+                selectedCount === 0
+                  ? "cursor-not-allowed border-[#fecaca] bg-[#fdecec] text-[#e1a2a2]"
+                  : "border-[#f3c2c2] bg-white text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
+              }`}
             >
               Riconcilia selezionati
             </button>
@@ -396,13 +491,42 @@ export default function ReconciliationPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                          aria-label="Altro"
+                        <DropdownMenu
+                          align="right"
+                          items={[
+                            {
+                              label: "Riconcilia",
+                              onClick: () => {
+                                setAllRows((prev) =>
+                                  prev.map((x) =>
+                                    x.id === r.id
+                                      ? {
+                                          ...x,
+                                          status: "Matched",
+                                          delta: "€0.00",
+                                          deltaTone: "neutral",
+                                        }
+                                      : x,
+                                  ),
+                                );
+                              },
+                            },
+                            {
+                              label: "Rimuovi",
+                              danger: true,
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              onClick: () => setRowRemoveTarget(r),
+                            },
+                          ]}
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                            aria-label="Altro"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

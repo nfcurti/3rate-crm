@@ -9,12 +9,18 @@ import {
   MoreVertical,
   Search,
   ShieldAlert,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
+import type { EndUserStatus } from "@/components/end-users/EndUsersTable";
 import { Topbar } from "@/components/layout/Topbar";
 import { StatusPill } from "@/components/vendors/StatusPill";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { getEndUserDemoById } from "@/lib/end-users-demo";
+import { parseRegisteredAtItalian } from "@/lib/end-user-registration-filter";
 
 type TabId = "panoramica" | "ordini" | "pagamenti";
 
@@ -430,7 +436,35 @@ const FULL_ORDERS_DEMO: FullOrderRow[] = [
   },
 ];
 
+function filterByItalianDateLast30Days<T extends { date: string }>(rows: T[]): T[] {
+  const withDates = rows
+    .map((r) => ({ r, d: parseRegisteredAtItalian(r.date) }))
+    .filter((x): x is { r: T; d: Date } => x.d !== null);
+  if (withDates.length === 0) return rows;
+  const maxT = Math.max(...withDates.map((x) => x.d.getTime()));
+  const cutoff = maxT - 30 * 24 * 60 * 60 * 1000;
+  return rows.filter((r) => {
+    const d = parseRegisteredAtItalian(r.date);
+    return d !== null && d.getTime() >= cutoff;
+  });
+}
+
 function OrdiniTab() {
+  const [orderRows, setOrderRows] = useState<FullOrderRow[]>(() => [
+    ...FULL_ORDERS_DEMO,
+  ]);
+  const [last30Active, setLast30Active] = useState(true);
+  const [removeOrderTarget, setRemoveOrderTarget] = useState<FullOrderRow | null>(
+    null,
+  );
+
+  const hasActiveFilters = last30Active;
+
+  const visibleOrders = useMemo(
+    () => (last30Active ? filterByItalianDateLast30Days(orderRows) : orderRows),
+    [orderRows, last30Active],
+  );
+
   return (
     <>
       <section className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -526,7 +560,13 @@ function OrdiniTab() {
           </div>
           <button
             type="button"
-            className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+            onClick={() => setLast30Active((v) => !v)}
+            aria-pressed={last30Active}
+            className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+              last30Active
+                ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+            }`}
           >
             Ultimi 30 giorni
           </button>
@@ -537,7 +577,56 @@ function OrdiniTab() {
             Tutti gli stati
           </button>
         </div>
+
+        {hasActiveFilters ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
+            <span className="text-[#9aa39a]">Filtri attivi:</span>
+            {last30Active ? (
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                aria-label="Rimuovi filtro Ultimi 30 giorni"
+                className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-[#e8ebe8]"
+              >
+                Ultimi 30 giorni
+                <span aria-hidden className="text-[#9aa39a]">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setLast30Active(false)}
+              className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
+            >
+              Cancella tutti
+            </button>
+          </div>
+        ) : null}
       </section>
+
+      <ConfirmationModal
+        open={removeOrderTarget !== null}
+        onClose={() => setRemoveOrderTarget(null)}
+        title="Rimuovere questo ordine?"
+        description={
+          removeOrderTarget ? (
+            <>
+              L&apos;ordine{" "}
+              <span className="font-semibold text-[#1f2b20]">
+                {removeOrderTarget.orderId}
+              </span>{" "}
+              verrà rimosso dall&apos;elenco (solo visualizzazione demo).
+            </>
+          ) : undefined
+        }
+        confirmLabel="Rimuovi"
+        onConfirm={() => {
+          if (!removeOrderTarget) return;
+          const id = removeOrderTarget.id;
+          setOrderRows((prev) => prev.filter((r) => r.id !== id));
+        }}
+      />
 
       <section className="mt-4 overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
         <div className="px-6 py-4">
@@ -567,7 +656,7 @@ function OrdiniTab() {
               </tr>
             </thead>
             <tbody className="text-[12px] text-[#1f2b20]">
-              {FULL_ORDERS_DEMO.map((o) => (
+              {visibleOrders.map((o) => (
                 <tr
                   key={o.id}
                   className="border-b border-black/5 transition-colors hover:bg-black/[0.02]"
@@ -620,13 +709,25 @@ function OrdiniTab() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                        aria-label="Altro"
+                      <DropdownMenu
+                        align="right"
+                        items={[
+                          {
+                            label: "Rimuovi",
+                            danger: true,
+                            icon: <Trash2 className="h-3.5 w-3.5" />,
+                            onClick: () => setRemoveOrderTarget(o),
+                          },
+                        ]}
                       >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                          aria-label="Altro"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenu>
                     </div>
                   </td>
                 </tr>
@@ -814,6 +915,21 @@ const TRANSACTIONS_DEMO: TransactionRow[] = [
 ];
 
 function PagamentiTab() {
+  const [txRows, setTxRows] = useState<TransactionRow[]>(() => [
+    ...TRANSACTIONS_DEMO,
+  ]);
+  const [last30Active, setLast30Active] = useState(true);
+  const [removeTxTarget, setRemoveTxTarget] = useState<TransactionRow | null>(
+    null,
+  );
+
+  const hasActiveFilters = last30Active;
+
+  const visibleTransactions = useMemo(
+    () => (last30Active ? filterByItalianDateLast30Days(txRows) : txRows),
+    [txRows, last30Active],
+  );
+
   return (
     <>
       <section className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -882,7 +998,13 @@ function PagamentiTab() {
           </div>
           <button
             type="button"
-            className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+            onClick={() => setLast30Active((v) => !v)}
+            aria-pressed={last30Active}
+            className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+              last30Active
+                ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+            }`}
           >
             Ultimi 30 giorni
           </button>
@@ -893,7 +1015,56 @@ function PagamentiTab() {
             Tutti gli stati
           </button>
         </div>
+
+        {hasActiveFilters ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
+            <span className="text-[#9aa39a]">Filtri attivi:</span>
+            {last30Active ? (
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                aria-label="Rimuovi filtro Ultimi 30 giorni"
+                className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-[#e8ebe8]"
+              >
+                Ultimi 30 giorni
+                <span aria-hidden className="text-[#9aa39a]">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setLast30Active(false)}
+              className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
+            >
+              Cancella tutti
+            </button>
+          </div>
+        ) : null}
       </section>
+
+      <ConfirmationModal
+        open={removeTxTarget !== null}
+        onClose={() => setRemoveTxTarget(null)}
+        title="Rimuovere questa transazione?"
+        description={
+          removeTxTarget ? (
+            <>
+              La transazione{" "}
+              <span className="font-semibold text-[#1f2b20]">
+                {removeTxTarget.txId}
+              </span>{" "}
+              verrà rimossa dall&apos;elenco (solo visualizzazione demo).
+            </>
+          ) : undefined
+        }
+        confirmLabel="Rimuovi"
+        onConfirm={() => {
+          if (!removeTxTarget) return;
+          const id = removeTxTarget.id;
+          setTxRows((prev) => prev.filter((r) => r.id !== id));
+        }}
+      />
 
       <section className="mt-4 overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
         <div className="px-6 py-4">
@@ -916,7 +1087,7 @@ function PagamentiTab() {
               </tr>
             </thead>
             <tbody className="text-[12px] text-[#1f2b20]">
-              {TRANSACTIONS_DEMO.map((t) => (
+              {visibleTransactions.map((t) => (
                 <tr
                   key={t.id}
                   className="border-b border-black/5 transition-colors hover:bg-black/[0.02]"
@@ -955,20 +1126,32 @@ function PagamentiTab() {
                   </td>
                   <td className="px-6 py-5 align-middle">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
+                      <Link
+                        href={`/transactions/${encodeURIComponent(t.id)}`}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
                         aria-label={`Vedi transazione ${t.txId}`}
                       >
                         <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                        aria-label="Altro"
+                      </Link>
+                      <DropdownMenu
+                        align="right"
+                        items={[
+                          {
+                            label: "Rimuovi",
+                            danger: true,
+                            icon: <Trash2 className="h-3.5 w-3.5" />,
+                            onClick: () => setRemoveTxTarget(t),
+                          },
+                        ]}
                       >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                          aria-label="Altro"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenu>
                     </div>
                   </td>
                 </tr>
@@ -1028,19 +1211,33 @@ export default function EndUserProfilePage({
   const { userId } = use(params);
   const user = useMemo(() => getEndUserDemoById(userId), [userId]);
   const [tab, setTab] = useState<TabId>("panoramica");
+  const [userBlocked, setUserBlocked] = useState(false);
+  const [blockConfirm, setBlockConfirm] = useState<null | "block" | "unblock">(
+    null,
+  );
+
+  useEffect(() => {
+    setUserBlocked(user?.status === "Bloccato");
+  }, [userId, user?.status]);
 
   const name = user?.name ?? "Maria Rossi";
   const userIdLabel = user?.userId ?? "USR-8821";
   const email = user?.email ?? "maria.rossi@email.it";
   const phone = user?.phone ?? "+39 345 678 9012";
   const registeredAt = user?.registeredAt ?? "15 Gen 2024";
-  const status = user?.status ?? "Attivo";
+
+  const displayStatus: EndUserStatus = userBlocked
+    ? "Bloccato"
+    : user?.status === "Bloccato"
+      ? "Attivo"
+      : user?.status ?? "Attivo";
+
   const statusTone =
-    status === "Attivo"
+    displayStatus === "Attivo"
       ? "green"
-      : status === "Pending"
+      : displayStatus === "Pending"
         ? "amber"
-        : status === "Bloccato"
+        : displayStatus === "Bloccato"
           ? "red"
           : "gray";
   const initials = name
@@ -1096,24 +1293,64 @@ export default function EndUserProfilePage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <StatusPill tone={statusTone}>● {status}</StatusPill>
-              <button
-                type="button"
+              <StatusPill tone={statusTone}>● {displayStatus}</StatusPill>
+              <Link
+                href={{
+                  pathname: "/end-users/email",
+                  query: {
+                    to: email,
+                    name,
+                  },
+                }}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
               >
                 <Mail className="h-4 w-4 text-[#6b746c]" />
                 Invia email
-              </button>
+              </Link>
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fdecec] px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+                onClick={() => setBlockConfirm(userBlocked ? "unblock" : "block")}
+                className={
+                  userBlocked
+                    ? "inline-flex h-9 items-center gap-2 rounded-lg border border-[#c6e6cf] bg-[#e7f6ea] px-4 text-[11px] font-semibold text-[#276749] hover:cursor-pointer hover:bg-[#d4edda]"
+                    : "inline-flex h-9 items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fdecec] px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+                }
               >
-                <ShieldAlert className="h-4 w-4" />
-                Blocca
+                {userBlocked ? (
+                  <>
+                    <ShieldCheck className="h-4 w-4" />
+                    Sblocca
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="h-4 w-4" />
+                    Blocca
+                  </>
+                )}
               </button>
             </div>
           </div>
         </section>
+
+        <ConfirmationModal
+          open={blockConfirm !== null}
+          onClose={() => setBlockConfirm(null)}
+          title={
+            blockConfirm === "unblock"
+              ? "Sbloccare questo utente?"
+              : "Bloccare questo utente?"
+          }
+          description={
+            blockConfirm === "unblock"
+              ? `${name} potrà di nuovo accedere e effettuare ordini. Confermi lo sblocco?`
+              : `${name} non potrà accedere finché non verrà sbloccato. Confermi il blocco?`
+          }
+          confirmLabel={blockConfirm === "unblock" ? "Sblocca" : "Blocca"}
+          variant={blockConfirm === "unblock" ? "primary" : "danger"}
+          onConfirm={() => {
+            setUserBlocked(blockConfirm === "block");
+          }}
+        />
 
         <section className="mt-4">
           <div className="flex items-center gap-6 border-b border-black/10 text-[11px] font-semibold text-[#6b746c]">

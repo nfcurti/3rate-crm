@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MiniLineChart } from "@/components/dashboard/MiniLineChart";
 import { RevenueCommissionChart } from "@/components/dashboard/RevenueCommissionChart";
@@ -86,12 +87,12 @@ export default function DashboardHomePage() {
             <div className="mt-1 text-[11px] font-medium text-[#1f2b20]/70">
               Ci sono 12 bonifici da Klarna in attesa di riconciliazione manuale.
             </div>
-            <button
-              type="button"
-              className="mt-2 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:underline"
+            <Link
+              href="/reconciliation"
+              className="mt-2 inline-block text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:underline"
             >
               Risolvi ora →
-            </button>
+            </Link>
           </div>
 
           <div className="rounded-xl border border-black/10 bg-[#fff4e5] p-4">
@@ -102,12 +103,12 @@ export default function DashboardHomePage() {
               5 nuovi venditori hanno completato l&apos;upload dei pacchetti e le
               verifiche KYC e attendono approvazione.
             </div>
-            <button
-              type="button"
-              className="mt-2 text-[11px] font-semibold text-[#b45309] hover:cursor-pointer hover:underline"
+            <Link
+              href="/vendors"
+              className="mt-2 inline-block text-[11px] font-semibold text-[#b45309] hover:cursor-pointer hover:underline"
             >
               Vai alle richieste →
-            </button>
+            </Link>
           </div>
 
           <div className="rounded-xl border border-black/10 bg-[#eaf2ff] p-4">
@@ -118,12 +119,12 @@ export default function DashboardHomePage() {
               Rilevato un picco di transazioni fallite da attrezzature (52) nelle
               ultime 2 ore.
             </div>
-            <button
-              type="button"
-              className="mt-2 text-[11px] font-semibold text-[#1d4ed8] hover:cursor-pointer hover:underline"
+            <Link
+              href="/transactions"
+              className="mt-2 inline-block text-[11px] font-semibold text-[#1d4ed8] hover:cursor-pointer hover:underline"
             >
               Vedi log →
-            </button>
+            </Link>
           </div>
         </section>
 
@@ -227,12 +228,12 @@ export default function DashboardHomePage() {
               <div className="text-[12px] font-semibold tracking-wide text-[#1f2b20]">
                 TOP VENDITORI MENSILI
               </div>
-              <a
-                href="#"
+              <Link
+                href="/vendors"
                 className="text-[11px] font-semibold text-[#38A169] hover:cursor-pointer hover:underline"
               >
                 Vedi tutti
-              </a>
+              </Link>
             </div>
             <div className="h-px w-full bg-black/5" />
             <div className="bg-[#f6f7f6] px-5 py-3">

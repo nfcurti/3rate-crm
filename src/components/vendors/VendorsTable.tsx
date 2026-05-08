@@ -1,8 +1,10 @@
 "use client";
 
-import { Eye, MoreVertical } from "lucide-react";
+import { Eye, MoreVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { StatusPill } from "./StatusPill";
 import { useVendorSelection } from "./VendorSelectionProvider";
 
@@ -28,11 +30,14 @@ function StatusTone(status: VendorRow["status"]) {
 export function VendorsTable({
   rows,
   viewHrefBuilder = (row) => `/vendors/${encodeURIComponent(row.id)}`,
+  onRemove,
 }: {
   rows: VendorRow[];
   viewHrefBuilder?: (row: VendorRow) => string;
+  onRemove?: (row: VendorRow) => void;
 }) {
-  const { selectedIds, isSelected, toggle, setAll } = useVendorSelection();
+  const { selectedIds, isSelected, toggle, setAll, remove } = useVendorSelection();
+  const [removeTarget, setRemoveTarget] = useState<VendorRow | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement | null>(null);
 
   const allChecked = useMemo(() => {
@@ -57,6 +62,26 @@ export function VendorsTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
+      <ConfirmationModal
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        title="Rimuovere questo venditore?"
+        description={
+          removeTarget ? (
+            <>
+              <span className="font-semibold text-[#1f2b20]">{removeTarget.name}</span>{" "}
+              verrà rimosso dall&apos;elenco. Potrai aggiungerlo di nuovo in seguito.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Rimuovi"
+        onConfirm={() => {
+          if (!removeTarget) return;
+          remove(removeTarget.id);
+          onRemove?.(removeTarget);
+        }}
+      />
+
       <div className="h-px w-full bg-black/5" />
 
       <div className="overflow-x-auto">
@@ -137,13 +162,27 @@ export function VendorsTable({
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                      aria-label="Altro"
+                    <DropdownMenu
+                      align="right"
+                      items={[
+                        {
+                          label: "Rimuovi",
+                          danger: true,
+                          icon: <Trash2 className="h-3.5 w-3.5" />,
+                          onClick: () => {
+                            setRemoveTarget(row);
+                          },
+                        },
+                      ]}
                     >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                        aria-label="Altro"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenu>
                   </div>
                 </td>
               </tr>

@@ -144,7 +144,7 @@ export function Sidebar() {
         </div>
       </nav>
 
-      <div className="mt-auto px-4 pb-5">
+      <div className="mt-auto px-4 pb-5 lg:hidden">
         <div className="flex items-center justify-between gap-3 rounded-xl bg-black/15 px-3 py-3 ring-1 ring-white/10">
           <div className="flex min-w-0 items-center gap-3">
             <div className="relative h-9 w-9 rounded-full bg-[#5DBE54]/25 ring-1 ring-white/15">
@@ -212,6 +212,33 @@ export function Sidebar() {
       ) : null}
 
       <aside className="hidden lg:block">{sidebarBody}</aside>
+
+      <div className="fixed bottom-5 left-4 z-40 hidden w-[228px] lg:block">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-[#234b39] px-3 py-3 ring-1 ring-black/10 shadow-sm">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative h-9 w-9 rounded-full bg-[#5DBE54]/25 ring-1 ring-white/15">
+              <span
+                aria-hidden
+                className="absolute -left-0.5 -top-0.5 h-3 w-3 rounded-full bg-[#76C043] ring-2 ring-[#234b39]"
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-semibold text-white">
+                Super Admin
+              </div>
+              <div className="text-[10px] font-medium text-white/70">ID: ADM-001</div>
+            </div>
+          </div>
+
+          <a
+            href="#"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 hover:cursor-pointer hover:bg-white/15"
+            aria-label="Esci"
+          >
+            <LogOut className="h-4 w-4 text-white/80" />
+          </a>
+        </div>
+      </div>
     </>
   );
 }

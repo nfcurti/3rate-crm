@@ -41,3 +41,9 @@ svg text {
   font-family: var(--font-sans);
 }
 
+/* Ensure native form controls match 3rate green */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: #214e3a;
+}
+

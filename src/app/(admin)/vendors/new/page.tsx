@@ -3,13 +3,27 @@
 import {
   ChevronRight,
   Eye,
+  FileText,
   Search,
   ShieldCheck,
   Upload,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
 import { Topbar } from "@/components/layout/Topbar";
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function SectionCard({
   title,
@@ -84,26 +98,125 @@ function Pill({
 function UploadCard({
   title,
   subtitle,
+  accept = "application/pdf,image/png,image/jpeg",
+  maxSizeMB = 10,
+  onChange,
 }: {
   title: string;
   subtitle: string;
+  accept?: string;
+  maxSizeMB?: number;
+  onChange?: (file: File | null) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  function processFile(f: File) {
+    if (f.size > maxSizeMB * 1024 * 1024) {
+      setError(`Il file supera ${maxSizeMB}MB`);
+      setFile(null);
+      onChange?.(null);
+      return;
+    }
+    setError(null);
+    setFile(f);
+    onChange?.(f);
+  }
+
+  function handleSelect() {
+    inputRef.current?.click();
+  }
+
+  function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) processFile(f);
+  }
+
+  function handleRemove() {
+    setFile(null);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+    onChange?.(null);
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+  }
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) processFile(f);
+  }
+
   return (
-    <div className="rounded-xl border border-dashed border-black/15 bg-white p-4">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`rounded-xl border border-dashed p-4 transition-colors ${
+        dragOver
+          ? "border-[#5DBE54] bg-[#e7f6ea]"
+          : "border-black/15 bg-white"
+      }`}
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f2f4f2] text-[#6b746c]">
           <Upload className="h-4 w-4" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-[11px] font-semibold text-[#1f2b20]">{title}</div>
           <div className="mt-0.5 text-[10px] font-medium text-[#9aa39a]">
             {subtitle}
           </div>
+
+          {file ? (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#5DBE54]/30 bg-[#e7f6ea] px-3 py-2">
+              <FileText className="h-3.5 w-3.5 flex-none text-[#38A169]" />
+              <div className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#1f5132]">
+                {file.name}
+              </div>
+              <span className="flex-none text-[10px] font-medium text-[#6b746c]">
+                {formatBytes(file.size)}
+              </span>
+              <button
+                type="button"
+                onClick={handleRemove}
+                aria-label="Rimuovi file"
+                className="inline-flex h-5 w-5 flex-none items-center justify-center rounded text-[#6b746c] hover:cursor-pointer hover:bg-black/10"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-2 text-[10px] font-semibold text-[#E53E3E]">
+              {error}
+            </div>
+          ) : null}
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={handleInputChange}
+          />
+
           <button
             type="button"
+            onClick={handleSelect}
             className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-black/10 bg-white px-3 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
           >
-            Scegli file
+            {file ? "Cambia file" : "Scegli file"}
           </button>
         </div>
       </div>

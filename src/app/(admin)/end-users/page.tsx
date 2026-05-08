@@ -2,15 +2,40 @@
 
 import { Mail, Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { EndUsersTable } from "@/components/end-users/EndUsersTable";
+import { RegistrationDateFilterModal } from "@/components/end-users/RegistrationDateFilterModal";
 import { useEndUserSelection } from "@/components/end-users/EndUserSelectionProvider";
 import { Topbar } from "@/components/layout/Topbar";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { END_USERS_DEMO } from "@/lib/end-users-demo";
+import {
+  type RegistrationDateFilter,
+  formatRegistrationFilterLabel,
+  rowMatchesRegistrationFilter,
+} from "@/lib/end-user-registration-filter";
 
 export default function EndUsersPage() {
-  const { selectedIds, setAll } = useEndUserSelection();
-  const rows = useMemo(() => END_USERS_DEMO, []);
+  const { selectedIds, setAll, clear } = useEndUserSelection();
+  const [suspendOpen, setSuspendOpen] = useState(false);
+  const [allRows, setAllRows] = useState(() => END_USERS_DEMO);
+  const [dateFilter, setDateFilter] = useState<RegistrationDateFilter>({
+    mode: "none",
+  });
+  const [dateModalOpen, setDateModalOpen] = useState(false);
+
+  const selectedCount = selectedIds.size;
+  const hasDateFilter = dateFilter.mode !== "none";
+
+  const rows = useMemo(
+    () =>
+      allRows.filter((r) =>
+        rowMatchesRegistrationFilter(r.registeredAt, dateFilter),
+      ),
+    [allRows, dateFilter],
+  );
+
+  const dateButtonLabel = formatRegistrationFilterLabel(dateFilter);
 
   return (
     <>
@@ -73,20 +98,44 @@ export default function EndUsersPage() {
               />
             </div>
 
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <button
+                type="button"
+                onClick={() => setDateModalOpen(true)}
+                aria-pressed={hasDateFilter}
+                className={`inline-flex h-7 min-w-0 max-w-full items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+                  hasDateFilter
+                    ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                    : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+                }`}
+              >
+                <span className="truncate">{dateButtonLabel}</span>
+              </button>
+              {hasDateFilter ? (
+                <button
+                  type="button"
+                  onClick={() => setDateFilter({ mode: "none" })}
+                  className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                >
+                  Cancella data
+                </button>
+              ) : null}
+            </div>
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
-            >
-              Data registrazione
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5 lg:ml-0"
             >
               Tutti gli stati
             </button>
           </div>
         </section>
+
+        <RegistrationDateFilterModal
+          open={dateModalOpen}
+          onClose={() => setDateModalOpen(false)}
+          committed={dateFilter}
+          onApply={setDateFilter}
+        />
 
         <section className="mt-4 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -97,20 +146,51 @@ export default function EndUsersPage() {
                 checked={rows.length > 0 && rows.every((r) => selectedIds.has(r.id))}
                 onChange={(e) => setAll(rows, e.target.checked)}
               />
-              Seleziona tutti (342)
+              Seleziona tutti ({rows.length})
             </label>
 
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-[#f3c2c2] bg-white px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
+              disabled={selectedCount === 0}
+              onClick={() => setSuspendOpen(true)}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold ${
+                selectedCount === 0
+                  ? "cursor-not-allowed border-[#fecaca] bg-[#fdecec] text-[#e1a2a2]"
+                  : "border-[#fecaca] bg-[#fdecec] text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+              }`}
             >
               Sospendi selezionati
             </button>
           </div>
         </section>
 
+        <ConfirmationModal
+          open={suspendOpen}
+          onClose={() => setSuspendOpen(false)}
+          title="Sospendere gli utenti selezionati?"
+          description={
+            selectedCount === 0 ? undefined : (
+              <>
+                Stai per sospendere{" "}
+                <span className="font-semibold text-[#1f2b20]">{selectedCount}</span>{" "}
+                {selectedCount === 1 ? "utente" : "utenti"}. Potrai gestire lo stato dal
+                dettaglio utente.
+              </>
+            )
+          }
+          confirmLabel="Sospendi"
+          onConfirm={() => {
+            clear();
+          }}
+        />
+
         <section className="mt-4">
-          <EndUsersTable rows={rows} />
+          <EndUsersTable
+            rows={rows}
+            onRemove={(row) =>
+              setAllRows((prev) => prev.filter((r) => r.id !== row.id))
+            }
+          />
         </section>
       </div>
     </>

@@ -1,9 +1,12 @@
 "use client";
 
-import { Eye, MoreVertical, Search } from "lucide-react";
+import { Eye, MoreVertical, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
+import { parseRegisteredAtItalian } from "@/lib/end-user-registration-filter";
 
 type GlobalTxStatus = "Completato" | "Rimborsato" | "In Sospeso" | "Stornato";
 
@@ -178,10 +181,31 @@ const TRANSACTIONS_DEMO: GlobalTransaction[] = [
   },
 ];
 
+function filterByItalianDateLast30Days<T extends { date: string }>(rows: T[]): T[] {
+  const withDates = rows
+    .map((r) => ({ r, d: parseRegisteredAtItalian(r.date) }))
+    .filter((x): x is { r: T; d: Date } => x.d !== null);
+  if (withDates.length === 0) return rows;
+  const maxT = Math.max(...withDates.map((x) => x.d.getTime()));
+  const cutoff = maxT - 30 * 24 * 60 * 60 * 1000;
+  return rows.filter((r) => {
+    const d = parseRegisteredAtItalian(r.date);
+    return d !== null && d.getTime() >= cutoff;
+  });
+}
+
 export default function TransactionsPage() {
-  const rows = useMemo(() => TRANSACTIONS_DEMO, []);
+  const [allRows, setAllRows] = useState<GlobalTransaction[]>(() => TRANSACTIONS_DEMO);
+  const [last30Active, setLast30Active] = useState(true);
+  const [removeTarget, setRemoveTarget] = useState<GlobalTransaction | null>(null);
+  const [forceRefundOpen, setForceRefundOpen] = useState(false);
+  const rows = useMemo(
+    () => (last30Active ? filterByItalianDateLast30Days(allRows) : allRows),
+    [allRows, last30Active],
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const masterRef = useRef<HTMLInputElement | null>(null);
+  const selectedCount = selectedIds.size;
 
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
   const someChecked =
@@ -210,6 +234,60 @@ export default function TransactionsPage() {
       <Topbar title="Transazioni e vendite globali" />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-6">
+        <ConfirmationModal
+          open={removeTarget !== null}
+          onClose={() => setRemoveTarget(null)}
+          title="Rimuovere questa transazione?"
+          description={
+            removeTarget ? (
+              <>
+                La transazione{" "}
+                <span className="font-semibold text-[#1f2b20]">{removeTarget.txId}</span>{" "}
+                verrà rimossa dall&apos;elenco (solo visualizzazione demo).
+              </>
+            ) : undefined
+          }
+          confirmLabel="Rimuovi"
+          onConfirm={() => {
+            if (!removeTarget) return;
+            const id = removeTarget.id;
+            setAllRows((prev) => prev.filter((r) => r.id !== id));
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }}
+        />
+
+        <ConfirmationModal
+          open={forceRefundOpen}
+          onClose={() => setForceRefundOpen(false)}
+          title="Forzare rimborso?"
+          description={
+            selectedCount === 0 ? undefined : (
+              <>
+                Stai per forzare il rimborso di{" "}
+                <span className="font-semibold text-[#1f2b20]">
+                  {selectedCount}
+                </span>{" "}
+                transazioni selezionate. Confermi?
+              </>
+            )
+          }
+          confirmLabel="Forza rimborso"
+          onConfirm={() => {
+            if (selectedCount === 0) return;
+            const ids = new Set(selectedIds);
+            setAllRows((prev) =>
+              prev.map((r) =>
+                ids.has(r.id) ? { ...r, status: "Rimborsato" } : r,
+              ),
+            );
+            setSelectedIds(new Set());
+          }}
+        />
+
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "GMV", value: "€1,245,680.00", tone: "text-[#1f2b20]" },
@@ -254,7 +332,13 @@ export default function TransactionsPage() {
             </div>
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+              onClick={() => setLast30Active((v) => !v)}
+              aria-pressed={last30Active}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+                last30Active
+                  ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                  : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+              }`}
             >
               Ultimi 30 giorni
             </button>
@@ -272,18 +356,26 @@ export default function TransactionsPage() {
             </button>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
-            <span className="text-[#9aa39a]">Filtri attivi:</span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20]">
-              Ultimi 30 giorni <span className="text-[#9aa39a]">×</span>
-            </span>
-            <button
-              type="button"
-              className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
-            >
-              Cancella tutti
-            </button>
-          </div>
+          {last30Active ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
+              <span className="text-[#9aa39a]">Filtri attivi:</span>
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                aria-label="Rimuovi filtro Ultimi 30 giorni"
+                className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-[#e8ebe8]"
+              >
+                Ultimi 30 giorni <span className="text-[#9aa39a]">×</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
+              >
+                Cancella tutti
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-4 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
@@ -300,7 +392,13 @@ export default function TransactionsPage() {
 
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-[#f3c2c2] bg-white px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
+              disabled={selectedCount === 0}
+              onClick={() => setForceRefundOpen(true)}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold ${
+                selectedCount === 0
+                  ? "cursor-not-allowed border-[#fecaca] bg-[#fdecec] text-[#e1a2a2]"
+                  : "border-[#f3c2c2] bg-white text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
+              }`}
             >
               Forza rimborso
             </button>
@@ -453,13 +551,25 @@ export default function TransactionsPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                          aria-label="Altro"
+                        <DropdownMenu
+                          align="right"
+                          items={[
+                            {
+                              label: "Rimuovi",
+                              danger: true,
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              onClick: () => setRemoveTarget(t),
+                            },
+                          ]}
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                            aria-label="Altro"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

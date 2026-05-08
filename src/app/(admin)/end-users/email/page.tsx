@@ -13,7 +13,7 @@ import {
   type DragEvent,
 } from "react";
 import { Topbar } from "@/components/layout/Topbar";
-import { useVendorSelection } from "@/components/vendors/VendorSelectionProvider";
+import { useEndUserSelection } from "@/components/end-users/EndUserSelectionProvider";
 import {
   Tooltip,
   TooltipContent,
@@ -154,20 +154,20 @@ function AttachmentRow({
   );
 }
 
-export default function VendorsBulkEmailPage() {
+export default function EndUsersBulkEmailPage() {
   return (
     <Suspense fallback={null}>
-      <VendorsEmailPageInner />
+      <EndUsersEmailPageInner />
     </Suspense>
   );
 }
 
-function VendorsEmailPageInner() {
-  const { selectedById } = useVendorSelection();
+function EndUsersEmailPageInner() {
+  const { selectedById } = useEndUserSelection();
   const searchParams = useSearchParams();
-  const singleVendorEmail = searchParams.get("to");
-  const singleVendorName = searchParams.get("name");
-  const isSingleVendor = Boolean(singleVendorEmail);
+  const singleUserEmail = searchParams.get("to");
+  const singleUserName = searchParams.get("name");
+  const isSingleUser = Boolean(singleUserEmail);
 
   const [attachments, setAttachments] = useState<Attachment[]>([
     { id: "demo-1", name: "Linee_Guida_Vendite.docx", size: 1.8 * 1024 * 1024 },
@@ -235,8 +235,8 @@ function VendorsEmailPageInner() {
       { initials: "LB", name: "Luca Bianchi", email: "luca.bianchi@email.it" },
       { initials: "GV", name: "Giulia Verdi", email: "giulia.verdi@email.it" },
       { initials: "MC", name: "Marco Conti", email: "marco.conti@email.it" },
+      { initials: "AR", name: "Andrea Russo", email: "andrea.russo@email.it" },
       { initials: "SF", name: "Sofia Ferrari", email: "sofia.ferrari@email.it" },
-      { initials: "DR", name: "Davide Romano", email: "davide.romano@email.it" },
     ],
     [],
   );
@@ -271,13 +271,13 @@ function VendorsEmailPageInner() {
         title={null}
         breadcrumb={
           <span className="inline-flex items-center gap-2">
-            <Link href="/vendors" className="hover:cursor-pointer hover:underline">
-              Venditori
+            <Link href="/end-users" className="hover:cursor-pointer hover:underline">
+              Utenti
             </Link>
             <ChevronRight className="h-4 w-4" />
-            {isSingleVendor && singleVendorName ? (
+            {isSingleUser && singleUserName ? (
               <>
-                <span className="text-[#6b746c]">{singleVendorName}</span>
+                <span className="text-[#6b746c]">{singleUserName}</span>
                 <ChevronRight className="h-4 w-4" />
                 <span className="text-[#6b746c]">Invia email</span>
               </>
@@ -290,7 +290,7 @@ function VendorsEmailPageInner() {
 
       <div className={`mx-auto w-full max-w-6xl px-6 py-6 ${inter.className}`}>
         <div className="space-y-4">
-          {isSingleVendor ? null : (
+          {isSingleUser ? null : (
             <SectionCard title="DESTINATARI SELEZIONATI">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {selectedRecipients.slice(0, 6).map((r) => (
@@ -325,7 +325,7 @@ function VendorsEmailPageInner() {
                 </TooltipProvider>
 
                 <Link
-                  href="/vendors/email/recipients"
+                  href="/end-users/email/recipients"
                   className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#214e3a] px-4 text-[12px] font-semibold text-white shadow-sm hover:cursor-pointer hover:bg-[#1a3f2e]"
                 >
                   Modifica selezione
@@ -337,18 +337,18 @@ function VendorsEmailPageInner() {
           <SectionCard title="COMPONI EMAIL">
             <div className="space-y-4">
               <Field label="Mittente" disabled value="noreply@3rate.com" />
-              {isSingleVendor && singleVendorEmail ? (
+              {isSingleUser && singleUserEmail ? (
                 <Field
-                  key={singleVendorEmail}
+                  key={singleUserEmail}
                   label="Destinatario"
                   disabled
-                  value={singleVendorEmail}
+                  value={singleUserEmail}
                 />
               ) : null}
               <Field
                 label="Oggetto email"
                 required
-                placeholder="Es: Importante aggiornamento per i venditori..."
+                placeholder="Es: Novità per i tuoi ordini su 3rate..."
               />
 
               <div className="space-y-2">

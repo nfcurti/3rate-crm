@@ -1,16 +1,21 @@
 "use client";
 
-import { Mail, Plus, Search } from "lucide-react";
+import { Mail, Search, UserRoundPlus } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { VendorsTable } from "@/components/vendors/VendorsTable";
 import { useVendorSelection } from "@/components/vendors/VendorSelectionProvider";
 import { VENDORS_DEMO } from "@/lib/vendors-demo";
 
 export default function VendorsPage() {
-  const { selectedIds, setAll } = useVendorSelection();
-  const rows = useMemo(() => VENDORS_DEMO, []);
+  const { selectedIds, setAll, clear } = useVendorSelection();
+  const [suspendOpen, setSuspendOpen] = useState(false);
+  const [rows, setRows] = useState(VENDORS_DEMO);
+  const selectedCount = selectedIds.size;
+  const [last30Active, setLast30Active] = useState(true);
+  const hasActiveFilters = last30Active;
 
   return (
     <>
@@ -49,7 +54,7 @@ export default function VendorsPage() {
               className="flex items-center gap-4 rounded-xl border border-black/10 bg-white p-4 text-left shadow-sm hover:cursor-pointer hover:bg-black/5"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e7f6ea] text-[#38A169] ring-1 ring-[#5DBE54]/15">
-                <Plus className="h-5 w-5" />
+                <UserRoundPlus className="h-5 w-5" />
               </div>
               <div className="min-w-0">
                 <div className="text-[12px] font-semibold text-[#1f2b20]">
@@ -92,7 +97,13 @@ export default function VendorsPage() {
 
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
+              onClick={() => setLast30Active((v) => !v)}
+              aria-pressed={last30Active}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold hover:cursor-pointer ${
+                last30Active
+                  ? "border-[#5DBE54] bg-[#e7f6ea] text-[#1f5132] hover:bg-[#d8efdb]"
+                  : "border-black/10 bg-white text-[#1f2b20] hover:bg-black/5"
+              }`}
             >
               Ultimi 30 giorni
             </button>
@@ -104,18 +115,31 @@ export default function VendorsPage() {
             </button>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
-            <span className="text-[#9aa39a]">Filtri attivi:</span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20]">
-              Ultimi 30 giorni <span className="text-[#9aa39a]">×</span>
-            </span>
-            <button
-              type="button"
-              className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
-            >
-              Cancella tutti
-            </button>
-          </div>
+          {hasActiveFilters ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b746c]">
+              <span className="text-[#9aa39a]">Filtri attivi:</span>
+              {last30Active ? (
+                <button
+                  type="button"
+                  onClick={() => setLast30Active(false)}
+                  aria-label="Rimuovi filtro Ultimi 30 giorni"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#f2f4f2] px-3 py-1 text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-[#e8ebe8]"
+                >
+                  Ultimi 30 giorni
+                  <span aria-hidden className="text-[#9aa39a]">
+                    ×
+                  </span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setLast30Active(false)}
+                className="text-[10px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:underline"
+              >
+                Cancella tutti
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-4 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
@@ -132,15 +156,46 @@ export default function VendorsPage() {
 
             <button
               type="button"
-              className="inline-flex h-7 items-center justify-center rounded-lg border border-black/10 bg-[#fdecec] px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+              disabled={selectedCount === 0}
+              onClick={() => setSuspendOpen(true)}
+              className={`inline-flex h-7 items-center justify-center rounded-lg border px-4 text-[11px] font-semibold ${
+                selectedCount === 0
+                  ? "cursor-not-allowed border-[#fecaca] bg-[#fdecec] text-[#e1a2a2]"
+                  : "border-[#fecaca] bg-[#fdecec] text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+              }`}
             >
               Sospendi selezionati
             </button>
           </div>
         </section>
 
+        <ConfirmationModal
+          open={suspendOpen}
+          onClose={() => setSuspendOpen(false)}
+          title="Sospendere i venditori selezionati?"
+          description={
+            selectedCount === 0 ? undefined : (
+              <>
+                Stai per sospendere{" "}
+                <span className="font-semibold text-[#1f2b20]">{selectedCount}</span>{" "}
+                {selectedCount === 1 ? "venditore" : "venditori"}. Potrai gestire lo
+                stato dal profilo di ciascuno.
+              </>
+            )
+          }
+          confirmLabel="Sospendi"
+          onConfirm={() => {
+            clear();
+          }}
+        />
+
         <section className="mt-4">
-          <VendorsTable rows={rows} />
+          <VendorsTable
+            rows={rows}
+            onRemove={(row) =>
+              setRows((prev) => prev.filter((r) => r.id !== row.id))
+            }
+          />
         </section>
       </div>
     </>

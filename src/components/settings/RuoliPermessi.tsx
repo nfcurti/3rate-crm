@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreVertical } from "lucide-react";
+import Link from "next/link";
 import { Fragment, useState } from "react";
 
 type RoleId = "super-admin" | "amministrazione" | "venditore" | "supporto";
@@ -483,12 +484,12 @@ export function StaffUsersCard() {
       </ul>
 
       <div className="px-6 pb-5 pt-2">
-        <button
-          type="button"
+        <Link
+          href="/settings/staff"
           className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-black/10 bg-white px-3 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
         >
           Vedi tutti gli utenti staff
-        </button>
+        </Link>
       </div>
     </div>
   );

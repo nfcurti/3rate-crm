@@ -8,6 +8,7 @@ import {
   RuoliPermessiContent,
   StaffUsersCard,
 } from "@/components/settings/RuoliPermessi";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 
 type TabId = "generali" | "provider" | "ruoli" | "log";
 
@@ -70,6 +71,11 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("generali");
   const [autoApprove, setAutoApprove] = useState(false);
   const [requireVisura, setRequireVisura] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<
+    | null
+    | { type: "toggle"; key: "autoApprove" | "requireVisura"; next: boolean }
+    | { type: "suspendRegistrations" }
+  >(null);
 
   const isGenerali = tab === "generali";
 
@@ -78,6 +84,67 @@ export default function SettingsPage() {
       <Topbar title="Impostazioni di sistema" />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-6">
+        <ConfirmationModal
+          open={confirmAction !== null}
+          onClose={() => setConfirmAction(null)}
+          title={
+            confirmAction?.type === "suspendRegistrations"
+              ? "Sospendere nuove registrazioni?"
+              : confirmAction?.type === "toggle" && confirmAction.key === "autoApprove"
+                ? "Attivare approvazione automatica?"
+                : confirmAction?.type === "toggle" &&
+                    confirmAction.key === "requireVisura"
+                  ? "Modificare requisito visura camerale?"
+                  : "Confermi azione?"
+          }
+          description={
+            confirmAction?.type === "suspendRegistrations" ? (
+              <>
+                Le nuove registrazioni verranno sospese per tutti i venditori finché non
+                riattivi manualmente la funzionalità.
+              </>
+            ) : confirmAction?.type === "toggle" &&
+              confirmAction.key === "autoApprove" ? (
+              confirmAction.next ? (
+                <>I nuovi venditori verranno approvati automaticamente dopo l&apos;acquisto.</>
+              ) : (
+                <>I nuovi venditori non verranno più approvati automaticamente.</>
+              )
+            ) : confirmAction?.type === "toggle" &&
+              confirmAction.key === "requireVisura" ? (
+              confirmAction.next ? (
+                <>
+                  La visura camerale diventerà obbligatoria per le nuove registrazioni
+                  B2B.
+                </>
+              ) : (
+                <>
+                  La visura camerale non sarà più obbligatoria per le nuove registrazioni
+                  B2B.
+                </>
+              )
+            ) : undefined
+          }
+          confirmLabel={
+            confirmAction?.type === "suspendRegistrations"
+              ? "Sospendi"
+              : confirmAction?.type === "toggle"
+                ? "Conferma"
+                : "Conferma"
+          }
+          variant={confirmAction?.type === "suspendRegistrations" ? "danger" : "primary"}
+          onConfirm={() => {
+            if (!confirmAction) return;
+            if (confirmAction.type === "toggle") {
+              if (confirmAction.key === "autoApprove") setAutoApprove(confirmAction.next);
+              if (confirmAction.key === "requireVisura") setRequireVisura(confirmAction.next);
+            }
+            if (confirmAction.type === "suspendRegistrations") {
+              // TODO: wire to backend
+            }
+          }}
+        />
+
         <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
           <div className="flex items-center gap-6 border-b border-black/10 px-6 text-[12px] font-semibold text-[#6b746c]">
             {TABS.map((t) => {
@@ -201,7 +268,9 @@ export default function SettingsPage() {
                       </div>
                       <Toggle
                         checked={autoApprove}
-                        onChange={setAutoApprove}
+                        onChange={(next) =>
+                          setConfirmAction({ type: "toggle", key: "autoApprove", next })
+                        }
                         label="Approvazione automatica"
                       />
                     </div>
@@ -218,7 +287,9 @@ export default function SettingsPage() {
                       </div>
                       <Toggle
                         checked={requireVisura}
-                        onChange={setRequireVisura}
+                        onChange={(next) =>
+                          setConfirmAction({ type: "toggle", key: "requireVisura", next })
+                        }
                         label="Richiedi visura camerale"
                       />
                     </div>
@@ -247,6 +318,7 @@ export default function SettingsPage() {
                   </p>
                   <button
                     type="button"
+                    onClick={() => setConfirmAction({ type: "suspendRegistrations" })}
                     className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-[#fecaca] bg-white px-3 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fdecec]"
                   >
                     Sospendi nuove registrazioni

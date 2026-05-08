@@ -1,19 +1,25 @@
 "use client";
 
 import {
+  Ban,
   ChevronDown,
   ChevronRight,
+  Copy,
   Eye,
   Mail,
   MoreVertical,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { use, useMemo, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { StatusPill } from "@/components/vendors/StatusPill";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { getVendorDemoById } from "@/lib/vendors-demo";
 
 function StatCard({
@@ -54,7 +60,7 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
-type ProductStatus = "ATTIVO" | "ESAURITO";
+type ProductStatus = "ATTIVO" | "ESAURITO" | "SOSPESO";
 
 type ProductRow = {
   id: string;
@@ -80,7 +86,12 @@ function ProductStatusCell({
   status: ProductStatus;
   since: string;
 }) {
-  const tone = status === "ATTIVO" ? "text-[#38A169]" : "text-[#E53E3E]";
+  const tone =
+    status === "ATTIVO"
+      ? "text-[#38A169]"
+      : status === "SOSPESO"
+        ? "text-[#D69E2E]"
+        : "text-[#E53E3E]";
 
   return (
     <div className="flex flex-col gap-1">
@@ -109,94 +120,99 @@ function Metric({
   );
 }
 
-function ProductsTab({ totalText }: { totalText: string }) {
-  const rows: ProductRow[] = useMemo(
-    () => [
-      {
-        id: "p1",
-        status: "ATTIVO",
-        statusSince: "Dal: 12 Gen 2024",
-        title: "Cuffie Wireless Pro – Cancellazione Rumore Attiva",
-        asin: "B0DK7V5NXL",
-        sku: "3R-9921-BLK",
-        variantsText: "+3 Varianti",
-        todaySales: "€9,796.00",
-        todayUnits: 124,
-        todayViews: 3420,
-        available: 20,
-        reorder: 10,
-        price: "€79.00",
-        commission: "10%",
-      },
-      {
-        id: "p2",
-        status: "ESAURITO",
-        statusSince: "Da: 20 Mar 2024",
-        title: "Macchina Caffè Barista Pro – Doppia Caldaia",
-        asin: "B0J8R4KZLM",
-        sku: "3R-1020-SS",
-        variantsText: "+2 Varianti",
-        todaySales: "€35,168.00",
-        todayUnits: 32,
-        todayViews: 1205,
-        available: 0,
-        reorder: 0,
-        price: "€110.00",
-        commission: "10%",
-      },
-      {
-        id: "p3",
-        status: "ATTIVO",
-        statusSince: "Dal: 05 Feb 2024",
-        title: "Laptop UltraBook 15\" – Intel i7 16GB RAM",
-        asin: "B0CKR8WNP5",
-        sku: "3R-5543-SLV",
-        variantsText: "+1 Variante",
-        todaySales: "€42,350.00",
-        todayUnits: 45,
-        todayViews: 2890,
-        available: 8,
-        reorder: 5,
-        price: "€940.00",
-        commission: "10%",
-      },
-      {
-        id: "p4",
-        status: "ATTIVO",
-        statusSince: "Dal: 21 Mar 2024",
-        title: "Tastiera Meccanica RGB Gaming – Switch Blue",
-        asin: "B0CLP2Q2AR",
-        sku: "3R-7788-RGB",
-        variantsText: "+0 Varianti",
-        todaySales: "€0.00",
-        todayUnits: 0,
-        todayViews: 0,
-        available: 20,
-        reorder: 0,
-        price: "€129.00",
-        commission: "10%",
-      },
-      {
-        id: "p5",
-        status: "ATTIVO",
-        statusSince: "Dal: 02 Feb 2024",
-        title: "Mouse Wireless Ergonomico – 6 Pulsanti",
-        asin: "B0H9W9N9NM",
-        sku: "3R-3321-BLK",
-        variantsText: "+0 Varianti",
-        todaySales: "€5,480.00",
-        todayUnits: 137,
-        todayViews: 4320,
-        available: 45,
-        reorder: 15,
-        price: "€39.99",
-        commission: "10%",
-      },
-    ],
-    [],
-  );
+const DEMO_PRODUCT_ROWS: ProductRow[] = [
+  {
+    id: "p1",
+    status: "ATTIVO",
+    statusSince: "Dal: 12 Gen 2024",
+    title: "Cuffie Wireless Pro – Cancellazione Rumore Attiva",
+    asin: "B0DK7V5NXL",
+    sku: "3R-9921-BLK",
+    variantsText: "+3 Varianti",
+    todaySales: "€9,796.00",
+    todayUnits: 124,
+    todayViews: 3420,
+    available: 20,
+    reorder: 10,
+    price: "€79.00",
+    commission: "10%",
+  },
+  {
+    id: "p2",
+    status: "ESAURITO",
+    statusSince: "Da: 20 Mar 2024",
+    title: "Macchina Caffè Barista Pro – Doppia Caldaia",
+    asin: "B0J8R4KZLM",
+    sku: "3R-1020-SS",
+    variantsText: "+2 Varianti",
+    todaySales: "€35,168.00",
+    todayUnits: 32,
+    todayViews: 1205,
+    available: 0,
+    reorder: 0,
+    price: "€110.00",
+    commission: "10%",
+  },
+  {
+    id: "p3",
+    status: "ATTIVO",
+    statusSince: "Dal: 05 Feb 2024",
+    title: "Laptop UltraBook 15\" – Intel i7 16GB RAM",
+    asin: "B0CKR8WNP5",
+    sku: "3R-5543-SLV",
+    variantsText: "+1 Variante",
+    todaySales: "€42,350.00",
+    todayUnits: 45,
+    todayViews: 2890,
+    available: 8,
+    reorder: 5,
+    price: "€940.00",
+    commission: "10%",
+  },
+  {
+    id: "p4",
+    status: "ATTIVO",
+    statusSince: "Dal: 21 Mar 2024",
+    title: "Tastiera Meccanica RGB Gaming – Switch Blue",
+    asin: "B0CLP2Q2AR",
+    sku: "3R-7788-RGB",
+    variantsText: "+0 Varianti",
+    todaySales: "€0.00",
+    todayUnits: 0,
+    todayViews: 0,
+    available: 20,
+    reorder: 0,
+    price: "€129.00",
+    commission: "10%",
+  },
+  {
+    id: "p5",
+    status: "ATTIVO",
+    statusSince: "Dal: 02 Feb 2024",
+    title: "Mouse Wireless Ergonomico – 6 Pulsanti",
+    asin: "B0H9W9N9NM",
+    sku: "3R-3321-BLK",
+    variantsText: "+0 Varianti",
+    todaySales: "€5,480.00",
+    todayUnits: 137,
+    todayViews: 4320,
+    available: 45,
+    reorder: 15,
+    price: "€39.99",
+    commission: "10%",
+  },
+];
 
+function ProductsTab({ totalText }: { totalText: string }) {
+  const [rows, setRows] = useState<ProductRow[]>(() => DEMO_PRODUCT_ROWS);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [bulkSuspendOpen, setBulkSuspendOpen] = useState(false);
+  const [singleRemoveTarget, setSingleRemoveTarget] = useState<ProductRow | null>(
+    null,
+  );
+  const [singleSuspendTarget, setSingleSuspendTarget] = useState<ProductRow | null>(
+    null,
+  );
   const selectedCount = useMemo(
     () => Object.values(selected).filter(Boolean).length,
     [selected],
@@ -262,6 +278,7 @@ function ProductsTab({ totalText }: { totalText: string }) {
           <button
             type="button"
             disabled={selectedCount === 0}
+            onClick={() => setBulkSuspendOpen(true)}
             className={`inline-flex h-7 items-center justify-center rounded-lg border px-3 text-[11px] font-semibold ${
               selectedCount === 0
                 ? "cursor-not-allowed border-[#fecaca] bg-[#fdecec] text-[#e1a2a2]"
@@ -272,6 +289,91 @@ function ProductsTab({ totalText }: { totalText: string }) {
           </button>
         </div>
       </section>
+
+      <ConfirmationModal
+        open={bulkSuspendOpen}
+        onClose={() => setBulkSuspendOpen(false)}
+        title="Sospendere i prodotti selezionati?"
+        description={
+          selectedCount === 0 ? undefined : (
+            <>
+              Stai per sospendere{" "}
+              <span className="font-semibold text-[#1f2b20]">{selectedCount}</span>{" "}
+              {selectedCount === 1 ? "prodotto" : "prodotti"}. Non saranno più visibili
+              fino a riattivazione.
+            </>
+          )
+        }
+        confirmLabel="Sospendi"
+        onConfirm={() => {
+          const ids = Object.entries(selected)
+            .filter(([, v]) => v)
+            .map(([id]) => id);
+          setRows((prev) =>
+            prev.map((r) =>
+              ids.includes(r.id) && r.status === "ATTIVO"
+                ? { ...r, status: "SOSPESO", statusSince: "Da: oggi" }
+                : r,
+            ),
+          );
+          setSelected({});
+        }}
+      />
+
+      <ConfirmationModal
+        open={singleRemoveTarget !== null}
+        onClose={() => setSingleRemoveTarget(null)}
+        title="Rimuovere questo prodotto?"
+        description={
+          singleRemoveTarget ? (
+            <>
+              <span className="font-semibold text-[#1f2b20]">
+                {singleRemoveTarget.title}
+              </span>{" "}
+              verrà rimosso dall&apos;elenco del venditore.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Rimuovi"
+        onConfirm={() => {
+          if (!singleRemoveTarget) return;
+          const id = singleRemoveTarget.id;
+          setRows((prev) => prev.filter((r) => r.id !== id));
+          setSelected((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        }}
+      />
+
+      <ConfirmationModal
+        open={singleSuspendTarget !== null}
+        onClose={() => setSingleSuspendTarget(null)}
+        title="Sospendere questo prodotto?"
+        description={
+          singleSuspendTarget ? (
+            <>
+              <span className="font-semibold text-[#1f2b20]">
+                {singleSuspendTarget.title}
+              </span>{" "}
+              non sarà visibile nel marketplace fino alla riattivazione.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Sospendi"
+        onConfirm={() => {
+          if (!singleSuspendTarget) return;
+          const id = singleSuspendTarget.id;
+          setRows((prev) =>
+            prev.map((r) =>
+              r.id === id && r.status === "ATTIVO"
+                ? { ...r, status: "SOSPESO", statusSince: "Da: oggi" }
+                : r,
+            ),
+          );
+        }}
+      />
 
       <section className="mt-3 rounded-xl border border-black/10 bg-white shadow-sm">
         <div className="w-full overflow-x-auto">
@@ -366,13 +468,38 @@ function ProductsTab({ totalText }: { totalText: string }) {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                          aria-label="Altre azioni"
+                        <DropdownMenu
+                          align="right"
+                          items={[
+                            {
+                              label: "Copia SKU",
+                              icon: <Copy className="h-3.5 w-3.5" />,
+                              onClick: () => {
+                                void navigator.clipboard?.writeText(r.sku);
+                              },
+                            },
+                            {
+                              label: "Sospendi prodotto",
+                              icon: <Ban className="h-3.5 w-3.5" />,
+                              disabled: r.status !== "ATTIVO",
+                              onClick: () => setSingleSuspendTarget(r),
+                            },
+                            {
+                              label: "Rimuovi",
+                              danger: true,
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              onClick: () => setSingleRemoveTarget(r),
+                            },
+                          ]}
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                            aria-label="Altre azioni"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
@@ -968,6 +1095,11 @@ export default function VendorProfilePage({
 
   const name = vendor?.name ?? "Tech Store Milano Srl";
   const productsTotalText = "342";
+  const editCompanyContactsHref = `/vendors/${encodeURIComponent(vendorId)}/edit`;
+  const [vendorBlocked, setVendorBlocked] = useState(false);
+  const [blockConfirm, setBlockConfirm] = useState<null | "block" | "unblock">(
+    null,
+  );
 
   return (
     <>
@@ -1010,31 +1142,76 @@ export default function VendorProfilePage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <StatusPill tone="green">Attivo</StatusPill>
-              <button
-                type="button"
+              <StatusPill tone={vendorBlocked ? "red" : "green"}>
+                {vendorBlocked ? "Bloccato" : "Attivo"}
+              </StatusPill>
+              <Link
+                href={{
+                  pathname: "/vendors/email",
+                  query: {
+                    to: vendor?.email ?? "amministrazione@techstoremilano.it",
+                    name,
+                    vendorId: vendor?.vendorId ?? vendorId,
+                  },
+                }}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
               >
                 <Mail className="h-4 w-4 text-[#6b746c]" />
                 Invia email
-              </button>
-              <button
-                type="button"
+              </Link>
+              <Link
+                href={editCompanyContactsHref}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-black/10 bg-white px-4 text-[11px] font-semibold text-[#1f2b20] hover:cursor-pointer hover:bg-black/5"
               >
                 <Pencil className="h-4 w-4 text-[#6b746c]" />
                 Modifica
-              </button>
+              </Link>
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fdecec] px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+                onClick={() =>
+                  setBlockConfirm(vendorBlocked ? "unblock" : "block")
+                }
+                className={
+                  vendorBlocked
+                    ? "inline-flex h-9 items-center gap-2 rounded-lg border border-[#c6e6cf] bg-[#e7f6ea] px-4 text-[11px] font-semibold text-[#276749] hover:cursor-pointer hover:bg-[#d4edda]"
+                    : "inline-flex h-9 items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fdecec] px-4 text-[11px] font-semibold text-[#E53E3E] hover:cursor-pointer hover:bg-[#fbd6d6]"
+                }
               >
-                <ShieldAlert className="h-4 w-4" />
-                Blocca
+                {vendorBlocked ? (
+                  <>
+                    <ShieldCheck className="h-4 w-4" />
+                    Sblocca
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="h-4 w-4" />
+                    Blocca
+                  </>
+                )}
               </button>
             </div>
           </div>
         </section>
+
+        <ConfirmationModal
+          open={blockConfirm !== null}
+          onClose={() => setBlockConfirm(null)}
+          title={
+            blockConfirm === "unblock"
+              ? "Sbloccare questo venditore?"
+              : "Bloccare questo venditore?"
+          }
+          description={
+            blockConfirm === "unblock"
+              ? `${name} tornerà operativo sul marketplace. Potrai bloccarlo di nuovo in qualsiasi momento.`
+              : `${name} non potrà vendere finché non verrà sbloccato. Confermi il blocco?`
+          }
+          confirmLabel={blockConfirm === "unblock" ? "Sblocca" : "Blocca"}
+          variant={blockConfirm === "unblock" ? "primary" : "danger"}
+          onConfirm={() => {
+            setVendorBlocked(blockConfirm === "block");
+          }}
+        />
 
         <section className="mt-4">
           <div className="flex items-center gap-6 border-b border-black/10 text-[11px] font-semibold text-[#6b746c]">
@@ -1085,12 +1262,12 @@ export default function VendorProfilePage({
                   <div className="text-[11px] font-semibold tracking-wide text-[#1f2b20]">
                     DATI AZIENDALI E CONTATTI
                   </div>
-                  <button
-                    type="button"
+                  <Link
+                    href={editCompanyContactsHref}
                     className="text-[11px] font-semibold text-[#38A169] hover:cursor-pointer hover:underline"
                   >
                     Modifica
-                  </button>
+                  </Link>
                 </div>
                 <div className="h-px w-full bg-black/5" />
                 <div className="px-6 py-5">

@@ -1,9 +1,11 @@
 "use client";
 
-import { Eye, MoreVertical, RefreshCcw, SlidersHorizontal } from "lucide-react";
+import { Copy, Eye, MoreVertical, RefreshCcw, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StatusPill } from "@/components/vendors/StatusPill";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { useEndUserSelection } from "./EndUserSelectionProvider";
 
 export type EndUserStatus = "Attivo" | "Inattivo" | "Bloccato" | "Pending";
@@ -31,11 +33,14 @@ function statusTone(status: EndUserStatus): "green" | "amber" | "red" | "gray" {
 export function EndUsersTable({
   rows,
   viewHrefBuilder = (row) => `/end-users/${encodeURIComponent(row.id)}`,
+  onRemove,
 }: {
   rows: EndUserRow[];
   viewHrefBuilder?: (row: EndUserRow) => string;
+  onRemove?: (row: EndUserRow) => void;
 }) {
-  const { selectedIds, isSelected, toggle, setAll } = useEndUserSelection();
+  const { selectedIds, isSelected, toggle, setAll, remove } = useEndUserSelection();
+  const [removeTarget, setRemoveTarget] = useState<EndUserRow | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement | null>(null);
 
   const allChecked = useMemo(() => {
@@ -60,6 +65,26 @@ export function EndUsersTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
+      <ConfirmationModal
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        title="Rimuovere questo utente?"
+        description={
+          removeTarget ? (
+            <>
+              <span className="font-semibold text-[#1f2b20]">{removeTarget.name}</span>{" "}
+              verrà rimosso dall&apos;elenco. Potrai ripristinarlo dal backend se necessario.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Rimuovi"
+        onConfirm={() => {
+          if (!removeTarget) return;
+          remove(removeTarget.id);
+          onRemove?.(removeTarget);
+        }}
+      />
+
       <div className="flex items-center justify-between gap-3 px-5 py-4">
         <div className="text-[12px] font-semibold tracking-wide text-[#1f2b20]">
           LISTA UTENTI
@@ -172,13 +197,32 @@ export function EndUsersTable({
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
-                      aria-label="Altro"
+                    <DropdownMenu
+                      align="right"
+                      items={[
+                        {
+                          label: "Copia email",
+                          icon: <Copy className="h-3.5 w-3.5" />,
+                          onClick: () => {
+                            void navigator.clipboard?.writeText(row.email);
+                          },
+                        },
+                        {
+                          label: "Rimuovi",
+                          danger: true,
+                          icon: <Trash2 className="h-3.5 w-3.5" />,
+                          onClick: () => setRemoveTarget(row),
+                        },
+                      ]}
                     >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#6b746c] hover:cursor-pointer hover:bg-black/5"
+                        aria-label="Altro"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenu>
                   </div>
                 </td>
               </tr>
